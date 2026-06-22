@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Supabase 기반 사용자 게시판 및 관리자/광고주 대시보드 구축 — 프로젝트 제안서" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link href="https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2/fonts/variable/woff2/SUIT-Variable.css" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['SUIT Variable', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace']
+          },
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              200: '#bae6fd',
+              600: '#0284c7',
+              700: '#0369a1'
+            }
+          },
+          boxShadow: {
+            soft: '0 10px 30px -18px rgba(15, 23, 42, 0.35)'
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root { color-scheme: light; font-size: 16px; /* 12pt minimum base */ }
+    body {
+      font-family: 'SUIT Variable', sans-serif;
+      font-size: 1rem; /* 16px = 12pt */
+      background-image:
+        radial-gradient(circle at 12% 18%, rgba(14, 165, 233, 0.08), transparent 42%),
+        radial-gradient(circle at 88% 82%, rgba(2, 132, 199, 0.06), transparent 48%);
+    }
+
+    /* ─── doc-content typography ─── */
+    .doc-content h1, .doc-content h2, .doc-content h3, .doc-content h4 {
+      color: rgb(15 23 42); font-weight: 700; letter-spacing: -0.01em;
+      line-height: 1.3; margin-top: 1.6em; margin-bottom: 0.7em;
+    }
+    .doc-content h1 { font-size: 2rem; margin-top: 0.2em; }
+    .doc-content h2 { font-size: 1.4rem; }
+    .doc-content h3 { font-size: 1.15rem; }
+    .doc-content p, .doc-content li {
+      color: rgb(51 65 85); line-height: 1.8; font-size: 1rem;
+    }
+    .doc-content p, .doc-content ul, .doc-content ol,
+    .doc-content table, .doc-content pre, .doc-content blockquote {
+      margin-bottom: 1rem;
+    }
+    .doc-content ul, .doc-content ol { padding-left: 1.2rem; }
+    .doc-content ul { list-style: disc; }
+    .doc-content ol { list-style: decimal; }
+    .doc-content table {
+      width: 100%; border-collapse: collapse;
+      border: 1px solid rgb(226 232 240); border-radius: 0.75rem;
+      overflow: hidden; font-size: 1rem;
+    }
+    .doc-content th, .doc-content td {
+      border: 1px solid rgb(226 232 240); padding: 0.7rem 0.8rem;
+      text-align: left; vertical-align: top;
+    }
+    .doc-content th {
+      background: rgb(248 250 252); color: rgb(30 41 59); font-weight: 600;
+    }
+    .doc-content pre, .doc-content code {
+      font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+    }
+    .doc-content pre {
+      background: rgb(15 23 42); color: rgb(226 232 240);
+      padding: 1rem; border-radius: 0.75rem; overflow-x: auto;
+      font-size: 1rem; line-height: 1.65;
+    }
+    .doc-content p code, .doc-content li code,
+    .doc-content td code, .doc-content th code {
+      background: rgb(241 245 249); color: rgb(15 23 42);
+      border: 1px solid rgb(226 232 240); border-radius: 0.4rem;
+      padding: 0.08rem 0.4rem; font-size: 1em;
+    }
+    .doc-content blockquote {
+      border-left: 3px solid rgb(14 165 233); padding-left: 0.85rem;
+      color: rgb(71 85 105); background: rgb(240 249 255);
+      border-radius: 0.5rem; padding-top: 0.55rem; padding-bottom: 0.55rem;
+    }
+
+    /* ─── 12pt (16px) minimum font size ─── */
+    .text-xs { font-size: 1rem !important; }
+
+    /* ─── Timeline ─── */
+    .timeline { position: relative; padding-left: 2rem; }
+    .timeline::before {
+      content: ''; position: absolute; left: 0.6rem; top: 0.25rem; bottom: 0.25rem;
+      width: 2px; background: rgb(186 230 253);
+    }
+    .timeline-item { position: relative; margin-bottom: 1.75rem; }
+    .timeline-item::before {
+      content: ''; position: absolute; left: -1.65rem; top: 0.35rem;
+      width: 0.75rem; height: 0.75rem; border-radius: 50%;
+      background: rgb(2 132 199); border: 3px solid rgb(224 242 254);
+    }
+
+    /* ─── Page sections ─── */
+    .page-section { display: none; }
+    .page-section.active { display: block; }
+
+    /* ─── Mobile sidebar toggle ─── */
+    #sidebar-backdrop { display: none; }
+    #sidebar-backdrop.open { display: block; }
+    @media (max-width: 1023px) {
+      #sidebar { transform: translateX(-100%); transition: transform 0.2s ease; position: fixed; top: 0; left: 0; z-index: 40; height: 100vh; width: 80vw; max-width: 320px; }
+      #sidebar.open { transform: translateX(0); }
+    }
+  </style>
+  <title>Supabase 기반 사용자 게시판 및 관리자/광고주 대시보드 구축 — 프로젝트 제안서</title>
+</head>
+<body class="text-slate-800 font-sans antialiased">
+  <div class="mx-auto max-w-7xl px-4 py-6 md:px-8 md:py-10">
+
+    <!-- ─── Header ─── -->
+    <header class="mb-6 rounded-2xl border border-slate-200/70 bg-white/85 px-5 py-3 shadow-soft backdrop-blur">
+      <div class="flex flex-wrap items-center gap-3">
+        <button id="sidebar-toggle" class="lg:hidden inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-700 hover:border-sky-300 hover:text-sky-700">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+          메뉴
+        </button>
+        <a href="#home" class="inline-flex items-center shrink-0 text-sm font-bold tracking-tight text-slate-800">
+          프로젝트 제안서
+        </a>
+        <div class="hidden sm:block ml-auto text-right">
+          <p class="text-sm font-semibold tracking-[0.04em] text-sky-700/90">Supabase 커뮤니티 게시판 &amp; 광고 대시보드</p>
+          <p class="text-xs text-slate-400">프로젝트 제안서</p>
+        </div>
+      </div>
+    </header>
+
+    <div class="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+
+      <!-- ─── Sidebar ─── -->
+      <div id="sidebar-backdrop" class="fixed inset-0 bg-black/30 z-30 lg:hidden" onclick="closeSidebar()"></div>
+      <aside id="sidebar" class="rounded-2xl border border-slate-200/70 bg-white/90 p-4 shadow-soft backdrop-blur lg:sticky lg:top-6 lg:h-[calc(100vh-4rem)] lg:overflow-auto">
+        <nav id="nav" class="space-y-1">
+          <a href="#home" data-page="home" class="nav-link block rounded-xl border px-3 py-2 text-sm border-sky-200 bg-sky-50 font-medium text-sky-700">홈</a>
+          <div class="my-3 border-t border-slate-200"></div>
+          <p class="mb-2 mt-1 px-1 text-sm font-semibold tracking-[0.14em] text-slate-400">제안서</p>
+          <a href="#overview" data-page="overview" class="nav-link block rounded-xl border border-transparent px-3 py-2 text-sm text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900">프로젝트 소개</a>
+          <a href="#estimate" data-page="estimate" class="nav-link block rounded-xl border border-transparent px-3 py-2 text-sm text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900">견적서</a>
+          <a href="#manday" data-page="manday" class="nav-link block rounded-xl border border-transparent px-3 py-2 text-sm text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900">공수계산서</a>
+          <a href="#prd" data-page="prd" class="nav-link block rounded-xl border border-transparent px-3 py-2 text-sm text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900">PRD</a>
+          <div class="my-3 border-t border-slate-200"></div>
+          <p class="mb-2 mt-1 px-1 text-sm font-semibold tracking-[0.14em] text-slate-400">일정 &amp; 경험</p>
+          <a href="#timeline" data-page="timeline" class="nav-link block rounded-xl border border-transparent px-3 py-2 text-sm text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900">일정 제안</a>
+          <a href="#portfolio" data-page="portfolio" class="nav-link block rounded-xl border border-transparent px-3 py-2 text-sm text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900">유사 프로젝트 경험</a>
+        </nav>
+      </aside>
+
+      <!-- ─── Main Content ─── -->
+      <main class="min-w-0">
+
+        <!-- PAGE: Home -->
+        <div id="page-home" class="page-section active space-y-6">
+          <div class="rounded-2xl border border-slate-200/70 bg-white/95 p-6 shadow-soft backdrop-blur md:p-8">
+            <p class="mb-2 text-xs font-semibold tracking-[0.2em] text-sky-700/80">프로젝트 제안서</p>
+            <h1 class="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">Supabase 기반 사용자 게시판 및 관리자/광고주 대시보드 구축</h1>
+            <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-600 md:text-base">Supabase(PostgreSQL · Auth · Storage · Edge Functions) 기반으로 사용자 커뮤니티 게시판과 자체 광고 시스템을 통합 구축합니다. 관리자 · 광고주 백오피스는 상용 UI 템플릿을 적극 활용해 디자인 비용을 절감하고, 게시판 · 광고 트래킹 · 통계 등 핵심 기능에 예산을 집중합니다. Flutter 앱 웹뷰(WebView) 연동과 SEO 최적화까지 고려한 효율적 개발을 제안합니다.</p>
+            <div class="mt-4 flex flex-wrap items-center gap-2">
+              <span class="inline-flex rounded-full border border-sky-200 bg-sky-100 px-2.5 py-1 text-sm font-semibold tracking-[0.12em] text-sky-700">12,750,000원 (VAT 별도)</span>
+              <span class="inline-flex rounded-full border border-sky-200 bg-sky-100 px-2.5 py-1 text-sm font-semibold tracking-[0.12em] text-sky-700">60일</span>
+              <span class="inline-flex rounded-full border border-amber-200 bg-amber-100 px-2.5 py-1 text-sm font-semibold tracking-[0.12em] text-amber-700">웹 · IT 서비스 구축</span>
+              <a href="https://www.wishket.com/project/156240/" target="_blank" rel="noopener noreferrer"
+                 class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-sm font-medium text-slate-500 transition hover:border-sky-300 hover:text-sky-700">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                원본 공고
+              </a>
+            </div>
+          </div>
+
+          <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <a href="#overview" class="group rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-soft transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-white">
+              <div class="mb-3 inline-flex rounded-full border px-2.5 py-1 text-sm font-semibold tracking-[0.12em] bg-sky-100 text-sky-700 border-sky-200">소개</div>
+              <h2 class="text-lg font-semibold tracking-tight text-slate-900 group-hover:text-sky-700">프로젝트 소개</h2>
+              <p class="mt-2 text-sm leading-7 text-slate-600">프로젝트 분석, 핵심 요구사항 정리, 제안 포인트</p>
+            </a>
+            <a href="#estimate" class="group rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-soft transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-white">
+              <div class="mb-3 inline-flex rounded-full border px-2.5 py-1 text-sm font-semibold tracking-[0.12em] bg-sky-100 text-sky-700 border-sky-200">비용</div>
+              <h2 class="text-lg font-semibold tracking-tight text-slate-900 group-hover:text-sky-700">견적서</h2>
+              <p class="mt-2 text-sm leading-7 text-slate-600">항목별 비용 산출 근거 및 상세 견적</p>
+            </a>
+            <a href="#manday" class="group rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-soft transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-white">
+              <div class="mb-3 inline-flex rounded-full border px-2.5 py-1 text-sm font-semibold tracking-[0.12em] bg-sky-100 text-sky-700 border-sky-200">공수</div>
+              <h2 class="text-lg font-semibold tracking-tight text-slate-900 group-hover:text-sky-700">공수계산서</h2>
+              <p class="mt-2 text-sm leading-7 text-slate-600">기능별 개발 공수(man-day) 산출 내역</p>
+            </a>
+            <a href="#prd" class="group rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-soft transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-white">
+              <div class="mb-3 inline-flex rounded-full border px-2.5 py-1 text-sm font-semibold tracking-[0.12em] bg-amber-100 text-amber-700 border-amber-200">기획</div>
+              <h2 class="text-lg font-semibold tracking-tight text-slate-900 group-hover:text-sky-700">PRD</h2>
+              <p class="mt-2 text-sm leading-7 text-slate-600">기능 요구사항 정의서, 사용자 스토리, 기술 제약</p>
+            </a>
+            <a href="#timeline" class="group rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-soft transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-white">
+              <div class="mb-3 inline-flex rounded-full border px-2.5 py-1 text-sm font-semibold tracking-[0.12em] bg-amber-100 text-amber-700 border-amber-200">일정</div>
+              <h2 class="text-lg font-semibold tracking-tight text-slate-900 group-hover:text-sky-700">일정 제안</h2>
+              <p class="mt-2 text-sm leading-7 text-slate-600">단계별 마일스톤 및 산출물 일정표</p>
+            </a>
+            <a href="#portfolio" class="group rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-soft transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-white">
+              <div class="mb-3 inline-flex rounded-full border px-2.5 py-1 text-sm font-semibold tracking-[0.12em] bg-amber-100 text-amber-700 border-amber-200">경험</div>
+              <h2 class="text-lg font-semibold tracking-tight text-slate-900 group-hover:text-sky-700">유사 프로젝트 경험</h2>
+              <p class="mt-2 text-sm leading-7 text-slate-600">유사 프로젝트 수행 경험 및 기술 스택</p>
+            </a>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <div class="rounded-2xl border border-slate-200/70 bg-white/90 p-4 text-center shadow-soft backdrop-blur"><p class="text-2xl font-bold text-sky-700">65 M/D</p><p class="mt-1 text-sm text-slate-500">총 산정 공수</p></div>
+            <div class="rounded-2xl border border-slate-200/70 bg-white/90 p-4 text-center shadow-soft backdrop-blur"><p class="text-2xl font-bold text-sky-700">5종</p><p class="mt-1 text-sm text-slate-500">광고 소재 유형</p></div>
+            <div class="rounded-2xl border border-slate-200/70 bg-white/90 p-4 text-center shadow-soft backdrop-blur"><p class="text-2xl font-bold text-sky-700">4단계</p><p class="mt-1 text-sm text-slate-500">사용자 권한(RBAC)</p></div>
+            <div class="rounded-2xl border border-slate-200/70 bg-white/90 p-4 text-center shadow-soft backdrop-blur"><p class="text-2xl font-bold text-sky-700">60일</p><p class="mt-1 text-sm text-slate-500">제안 기간</p></div>
+          </div>
+
+          <div class="rounded-2xl border border-sky-200/70 bg-gradient-to-br from-sky-50 to-brand-50 p-6 text-center shadow-soft md:p-10">
+            <h2 class="text-xl font-bold tracking-tight text-slate-900 md:text-2xl">함께 만들어 가겠습니다</h2>
+            <p class="mx-auto mt-3 max-w-lg text-sm leading-7 text-slate-600">각 메뉴를 클릭하시면 상세 내용을 확인하실 수 있습니다.</p>
+          </div>
+        </div>
+
+        <!-- PAGE: 프로젝트 소개 -->
+        <div id="page-overview" class="page-section space-y-6">
+          <div class="rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-soft backdrop-blur md:p-8">
+            <article class="doc-content">
+              <h1>프로젝트 소개</h1>
+              <blockquote>커뮤니티 게시판으로 유저 체류 시간을 높이고, 자체 광고 시스템으로 수익화 기반을 마련합니다. 백오피스는 상용 UI 템플릿으로 비용을 절감하고, 게시판 · 광고 트래킹 · 통계 핵심 기능에 예산을 집중하여 Supabase 기반으로 효율적으로 구축합니다.</blockquote>
+
+              <h2>프로젝트 개요</h2>
+              <table>
+                <tr><th>항목</th><th>내용</th></tr>
+                <tr><td>프로젝트명</td><td><a href="https://www.wishket.com/project/156240/" target="_blank" rel="noopener noreferrer" class="text-sky-700 underline decoration-sky-300 hover:decoration-sky-500">Supabase 기반 사용자 게시판 및 관리자/광고주 대시보드 구축</a></td></tr>
+                <tr><td>카테고리</td><td>웹 · IT 서비스 구축</td></tr>
+                <tr><td>제안 금액</td><td>12,750,000원 (VAT 별도)</td></tr>
+                <tr><td>제안 기간</td><td>60일</td></tr>
+                <tr><td>핵심 기술</td><td>Supabase (PostgreSQL · Auth · Storage · Edge Functions), Next.js / React, Flutter WebView 연동</td></tr>
+              </table>
+
+              <h2>핵심 요구사항 분석</h2>
+              <ul>
+                <li>4단계 사용자 권한(관리자/광고주/유료/무료) 관리 및 권한 신청 승인 · 반려, 불량 유저 제재(차단)</li>
+                <li>게시글(광고/공지/일반) HTML 에디터, 복수 이미지 업로드, 예약발행 등 게시 상태 관리, 신고 접수 · 처리</li>
+                <li>광고 캠페인 생성 · 편집(기간/플랜/타겟/자동 만료)과 5종 광고 소재(피드 카드형 · 전면 팝업형 · 하단 배너형 · 바텀시트형 · 하단 슬라이드형) 관리</li>
+                <li>광고 클릭 리다이렉트 라우팅 및 노출수 · 클릭수 · CTR 집계 그래프, CSV 내보내기</li>
+                <li>광고주 전용 로그인 및 본인 캠페인 집행 현황 통계 · CSV</li>
+                <li>사용자 게시판(웹뷰): 익명 닉네임 글 작성(500자 / 이미지 3장), 댓글 · 대댓글, 신고, 스포일러, 투표글, 좋아요 · 스크랩</li>
+                <li>모바일 클라이언트 단 이미지 리사이징 · 압축, 클라이언트 AI 번역(캐시 · 로딩 · 재시도 · 원문보기, DB 미저장)</li>
+                <li>게시글 SEO 메타정보(URL Slug, OG Image, JSON-LD)</li>
+                <li>비기능: 트래킹 시 Supabase 과부하 방지 배치 최적화, AI 번역 API Key 노출 방지(Edge Functions 프록시)</li>
+                <li>Flutter 앱 웹뷰(WebView) 브릿지 연동</li>
+              </ul>
+
+              <h2>제안 포인트</h2>
+              <h3>1. 백오피스 비용 절감 · 핵심 기능 예산 집중</h3>
+              <ul>
+                <li>관리자 · 광고주 대시보드는 상용 UI 템플릿(MUI 등) 커스터마이징으로 빠르게 세팅하여 디자인 · 퍼블리싱 비용을 최소화합니다.</li>
+                <li>절감한 예산을 커뮤니티 게시판 · 광고 트래킹 · 통계 등 핵심 기능 구현에 집중 배분합니다.</li>
+              </ul>
+              <h3>2. 자체 광고 시스템 트래킹 · 통계</h3>
+              <ul>
+                <li>5종 광고 소재 노출, 클릭 리다이렉트 라우팅, 노출수 · 클릭수 · CTR 집계 및 CSV 내보내기를 구축합니다.</li>
+                <li>트래킹 이벤트는 버퍼링 · 배치 인서트와 집계 테이블 분리로 Supabase DB 부하를 최소화합니다.</li>
+              </ul>
+              <h3>3. Supabase 풀스택 · 보안</h3>
+              <ul>
+                <li>PostgreSQL Row Level Security 기반 4단계 권한 모델, Auth, Storage(이미지)를 안전하게 설계합니다.</li>
+                <li>AI 번역 API Key는 Edge Functions 프록시로 격리하여 클라이언트 노출을 차단합니다(번역 결과 DB 미저장).</li>
+              </ul>
+              <h3>4. 웹뷰 연동 &amp; SEO</h3>
+              <ul>
+                <li>Flutter 앱 WebView 브릿지(JS ↔ Native) 통신으로 인증 · 이벤트를 연동합니다.</li>
+                <li>SSR 기반 SEO(URL Slug, OG Image, JSON-LD)로 게시글 검색 노출을 최적화합니다.</li>
+              </ul>
+
+              <h2>사용 기술 및 툴</h2>
+              <h3>개발 기술</h3>
+              <div class="flex flex-wrap gap-2 not-prose mb-4">
+                <span class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sm font-medium text-sky-700">Supabase</span>
+                <span class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sm font-medium text-sky-700">PostgreSQL</span>
+                <span class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sm font-medium text-sky-700">Row Level Security</span>
+                <span class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sm font-medium text-sky-700">Edge Functions (Deno)</span>
+                <span class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sm font-medium text-sky-700">Next.js</span>
+                <span class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sm font-medium text-sky-700">React</span>
+                <span class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sm font-medium text-sky-700">TypeScript</span>
+                <span class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sm font-medium text-sky-700">MUI</span>
+                <span class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sm font-medium text-sky-700">Recharts</span>
+                <span class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sm font-medium text-sky-700">Flutter WebView</span>
+                <span class="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sm font-medium text-sky-700">Vercel</span>
+              </div>
+              <h3>협업 및 커뮤니케이션</h3>
+              <div class="flex flex-wrap gap-2 not-prose">
+                <span class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-700">Slack / 카카오톡</span>
+                <span class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-700">Zoom / Google Meet</span>
+                <span class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-700">Notion</span>
+                <span class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-sm font-medium text-amber-700">GitHub Issues</span>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <!-- PAGE: 견적서 -->
+        <div id="page-estimate" class="page-section space-y-6">
+          <div class="rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-soft backdrop-blur md:p-8">
+            <article class="doc-content">
+              <h1>견적서</h1>
+              <blockquote>본 견적서는 프로젝트 요구사항 분석을 기반으로 산출되었습니다.</blockquote>
+
+              <h2>견적 요약</h2>
+              <table>
+                <tr><th>항목</th><th>내용</th></tr>
+                <tr><td>프로젝트명</td><td>Supabase 기반 사용자 게시판 및 관리자/광고주 대시보드 구축</td></tr>
+                <tr><td>제안 금액</td><td><strong>12,750,000원 (VAT 별도)</strong></td></tr>
+                <tr><td>제안 기간</td><td>60일</td></tr>
+                <tr><td>견적 유효기간</td><td>제안일로부터 30일</td></tr>
+              </table>
+
+              <h2>상세 견적 내역</h2>
+              <table>
+                <thead>
+                  <tr><th>구분</th><th>항목</th><th>수량</th><th>단가</th><th>금액</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>기획/설계</td><td>요구사항 정의, ERD · RLS 설계, 사용자 게시판 화면설계</td><td>1식</td><td>-</td><td>1,150,000원</td></tr>
+                  <tr><td>디자인</td><td>사용자 게시판(웹뷰) UI/UX 디자인</td><td>1식</td><td>-</td><td>1,400,000원</td></tr>
+                  <tr><td>프론트엔드</td><td>사용자 게시판(웹뷰) — 글/댓글/신고/투표/번역/SEO</td><td>1식</td><td>-</td><td>3,600,000원</td></tr>
+                  <tr><td>프론트엔드</td><td>관리자 · 광고주 대시보드(상용 템플릿 커스터마이징)</td><td>1식</td><td>-</td><td>2,400,000원</td></tr>
+                  <tr><td>백엔드</td><td>Supabase 스키마/Auth/Storage, Edge Functions, 광고 트래킹 · 통계</td><td>1식</td><td>-</td><td>3,000,000원</td></tr>
+                  <tr><td>QA/배포</td><td>통합 테스트, WebView 연동 검증, 배포, 운영 매뉴얼</td><td>1식</td><td>-</td><td>1,200,000원</td></tr>
+                </tbody>
+                <tfoot>
+                  <tr><th colspan="4">합계 (VAT 별도)</th><th>12,750,000원</th></tr>
+                </tfoot>
+              </table>
+
+              <h2>산정 근거</h2>
+              <ul>
+                <li>관리자 · 광고주 백오피스는 상용 UI 템플릿(MUI 등)을 활용하여 디자인 · 퍼블리싱 공수를 최소화하고, 절감된 예산을 게시판 · 광고 트래킹 · 통계 핵심 기능에 집중 배분하였습니다.</li>
+                <li>Supabase(Auth/Storage/Edge Functions) 관리형 백엔드를 활용하여 서버 인프라 구축 공수를 절감하였습니다.</li>
+                <li>유사 프로젝트(어드민 RBAC, Supabase 백엔드, 자체 광고 트래킹) 수행 경험을 바탕으로 효율적으로 진행합니다.</li>
+                <li>금액은 VAT 별도이며, 산출물 일체(소스코드, Supabase 스키마/Edge Functions, 운영 매뉴얼)와 1개월 무상 하자보수를 포함합니다.</li>
+              </ul>
+
+              <h2>포함 사항</h2>
+              <ul>
+                <li>소스 코드 전체 이관 (프론트엔드 + Supabase 스키마/Edge Functions)</li>
+                <li>개발 문서 (DB 스키마, Edge Functions 명세, 배포 가이드, 운영 · 관리자 매뉴얼)</li>
+                <li>1개월 무상 하자 보수</li>
+                <li>배포 환경 세팅 (1회)</li>
+              </ul>
+
+              <h2>불포함 사항</h2>
+              <ul>
+                <li>Supabase 유료 플랜 · 서버 호스팅 비용</li>
+                <li>도메인 구매 비용</li>
+                <li>외부 유료 API(AI 번역 등) 사용 비용</li>
+                <li>Flutter 앱 본체 개발 (웹뷰 브릿지 연동 협업은 포함)</li>
+                <li>하자 보수 기간 이후 유지보수</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+
+        <!-- PAGE: 공수계산서 -->
+        <div id="page-manday" class="page-section space-y-6">
+          <div class="rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-soft backdrop-blur md:p-8">
+            <article class="doc-content">
+              <h1>공수계산서</h1>
+              <blockquote>기능별 개발 공수(Man-Day)를 산출하여 일정과 비용의 근거를 제시합니다.</blockquote>
+
+              <h2>공수 요약</h2>
+              <table>
+                <tr><th>구분</th><th>공수 (M/D)</th><th>비율</th></tr>
+                <tr><td>기획/설계</td><td>6 M/D</td><td>9%</td></tr>
+                <tr><td>디자인 (사용자 게시판)</td><td>7 M/D</td><td>11%</td></tr>
+                <tr><td>프론트엔드 (사용자 게시판)</td><td>14 M/D</td><td>22%</td></tr>
+                <tr><td>프론트엔드 (어드민 · 광고주)</td><td>12 M/D</td><td>18%</td></tr>
+                <tr><td>백엔드 (Supabase · Edge · 트래킹)</td><td>20 M/D</td><td>31%</td></tr>
+                <tr><td>QA/배포</td><td>6 M/D</td><td>9%</td></tr>
+                <tr><th>합계</th><th>65 M/D</th><th>100%</th></tr>
+              </table>
+
+              <h2>기능별 상세 공수</h2>
+              <table>
+                <thead>
+                  <tr><th>기능</th><th>세부 작업</th><th>담당</th><th>공수 (M/D)</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td rowspan="2">기획/설계</td><td>요구사항 정의서, 정보구조, 화면설계(사용자 게시판)</td><td>기획</td><td>4</td></tr>
+                  <tr><td>ERD · RLS 정책 설계, 어드민 템플릿 선정</td><td>설계</td><td>2</td></tr>
+                  <tr><td>디자인</td><td>사용자 게시판(웹뷰) UI/UX 디자인, 광고 소재 5종 가이드</td><td>디자인</td><td>7</td></tr>
+                  <tr><td rowspan="4">사용자 게시판(웹뷰)</td><td>글 작성(익명 닉네임/500자/이미지 3장), 목록 · 상세</td><td>FE</td><td>4</td></tr>
+                  <tr><td>댓글 · 대댓글, 신고, 스포일러, 투표글</td><td>FE</td><td>4</td></tr>
+                  <tr><td>좋아요 · 스크랩 · 내 글/스크랩, 클라이언트 이미지 리사이징</td><td>FE</td><td>3</td></tr>
+                  <tr><td>AI 번역(캐시/재시도/원문보기), SEO(slug/OG/JSON-LD)</td><td>FE</td><td>3</td></tr>
+                  <tr><td rowspan="3">관리자 · 광고주 대시보드</td><td>회원/4단계 권한 승인 · 반려, 제재, 게시판 · 신고 관리, HTML 에디터 · 예약발행</td><td>FE</td><td>5</td></tr>
+                  <tr><td>광고 캠페인 CRUD · 5종 소재 관리, 통계 그래프 · CSV</td><td>FE</td><td>4</td></tr>
+                  <tr><td>광고주 로그인 · 본인 캠페인 통계 · CSV</td><td>FE</td><td>3</td></tr>
+                  <tr><td rowspan="4">Supabase 백엔드</td><td>스키마 · RLS, Auth(4단계 권한), Storage(이미지)</td><td>BE</td><td>6</td></tr>
+                  <tr><td>Edge Functions: AI 번역 프록시, 광고 리다이렉트, 캠페인 자동 만료</td><td>BE</td><td>7</td></tr>
+                  <tr><td>광고 노출 · 클릭 트래킹 배치 최적화, CTR 집계</td><td>BE</td><td>4</td></tr>
+                  <tr><td>Flutter WebView 브릿지 연동(인증 · 이벤트 통신)</td><td>BE/FE</td><td>3</td></tr>
+                  <tr><td>QA/배포</td><td>통합 테스트, 부하 · 트래킹 검증, 배포, 운영 매뉴얼</td><td>QA</td><td>6</td></tr>
+                </tbody>
+              </table>
+
+              <h2>산정 기준</h2>
+              <ul>
+                <li>1 M/D = 8시간 기준 (1인 1일 작업량)</li>
+                <li>주 5일 근무 기준</li>
+                <li>버퍼 10~15% 포함</li>
+                <li>유사 프로젝트 수행 경험 기반 효율적 개발</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+
+        <!-- PAGE: PRD -->
+        <div id="page-prd" class="page-section space-y-6">
+          <div class="rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-soft backdrop-blur md:p-8">
+            <article class="doc-content">
+              <h1>PRD (Product Requirements Document)</h1>
+              <blockquote>프로젝트 요구사항을 정의하고 기능 범위를 명확히 합니다.</blockquote>
+
+              <h2>1. 프로젝트 배경 및 목적</h2>
+              <p>앱 내 커뮤니티 기능을 강화하여 유저 체류 시간을 늘리고, 자체 광고 캠페인 운영을 통한 수익화 기반을 마련하는 것이 목표입니다. 관리자 · 광고주 백오피스는 상용 UI 템플릿을 적극 활용해 디자인 · 퍼블리싱 비용을 절감하고, 일반 유저가 사용하는 커뮤니티 게시판과 광고 트래킹 등 핵심 기능에 예산을 집중하여 Supabase 기반으로 효율적으로 구축합니다.</p>
+
+              <h2>2. 사용자 정의</h2>
+              <table>
+                <thead>
+                  <tr><th>사용자 유형</th><th>설명</th><th>주요 기능</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>관리자</td><td>시스템 전체 운영</td><td>회원/권한 승인 · 반려, 제재, 게시판 · 신고 관리, 공지/광고 게시글, 캠페인 · 소재 관리, 통계</td></tr>
+                  <tr><td>광고주</td><td>광고 집행 주체</td><td>로그인, 본인 캠페인 집행 현황 통계 조회, CSV 내보내기</td></tr>
+                  <tr><td>유료 회원</td><td>승급 사용자</td><td>게시판 전 기능 + 권한별 추가 혜택(범위 협의)</td></tr>
+                  <tr><td>무료 회원</td><td>일반 사용자</td><td>게시글 · 댓글 작성, 신고, 좋아요 · 스크랩, 투표, 번역</td></tr>
+                </tbody>
+              </table>
+
+              <h2>3. 기능 요구사항</h2>
+              <h3>3.1 게시판 및 회원 관리자</h3>
+              <ul>
+                <li><strong>[필수]</strong> 4단계 권한(관리자/광고주/유료/무료) 및 권한 신청 승인 · 반려</li>
+                <li><strong>[필수]</strong> 전체 회원 목록 조회, 불량 유저 제재(차단)</li>
+                <li><strong>[필수]</strong> 게시글(광고/공지/일반) HTML 에디터, 복수 이미지 업로드, 예약발행 등 게시 상태 관리</li>
+                <li><strong>[필수]</strong> 게시글 · 댓글 목록 관리, 신고 내역 접수 · 처리</li>
+              </ul>
+              <h3>3.2 광고 캠페인 및 통계 관리</h3>
+              <ul>
+                <li><strong>[필수]</strong> 캠페인 생성 · 편집(기간/플랜/타겟/상태/자동 만료)</li>
+                <li><strong>[필수]</strong> 5종 광고 소재(피드 카드형/전면 팝업형/하단 배너형/바텀시트형/하단 슬라이드형)</li>
+                <li><strong>[필수]</strong> 광고 클릭 시 외부 링크 리다이렉트 라우팅</li>
+                <li><strong>[필수]</strong> 노출수/클릭수/CTR 집계 그래프, CSV 내보내기</li>
+              </ul>
+              <h3>3.3 광고주 대시보드</h3>
+              <ul>
+                <li><strong>[필수]</strong> 광고주 로그인, 본인 캠페인 집행 현황 통계, CSV 내보내기</li>
+              </ul>
+              <h3>3.4 사용자 게시판 (웹뷰)</h3>
+              <ul>
+                <li><strong>[필수]</strong> 관리자 작성 공지/광고 노출, 익명 닉네임 글 작성(500자, 이미지 3장)</li>
+                <li><strong>[필수]</strong> 모바일 클라이언트 단 이미지 리사이징 · 압축</li>
+                <li><strong>[필수]</strong> 댓글 · 대댓글, 악성 유저/게시글 신고</li>
+                <li><strong>[필수]</strong> 스포일러(비로그인 시 일부 가림), 투표글</li>
+                <li><strong>[필수]</strong> 좋아요 · 스크랩 · 내 글/스크랩 보기</li>
+                <li><strong>[필수]</strong> 클라이언트 AI 번역(캐시/로딩/재시도/원문보기, DB 미저장)</li>
+                <li><strong>[필수]</strong> SEO 메타정보(URL Slug, OG Image, JSON-LD)</li>
+              </ul>
+
+              <h2>4. 비기능 요구사항</h2>
+              <table>
+                <thead>
+                  <tr><th>항목</th><th>요구사항</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>성능</td><td>광고 노출 · 클릭 트래킹 시 이벤트 버퍼링 · 배치 인서트로 Supabase 부하 최소화, 집계 테이블 분리</td></tr>
+                  <tr><td>보안/인증</td><td>AI 번역 API Key는 Edge Functions 프록시로 격리(클라이언트 미노출), RLS 기반 데이터 접근 제어</td></tr>
+                  <tr><td>SEO</td><td>SSR 기반 메타 · OG · JSON-LD, 게시글 URL Slug</td></tr>
+                  <tr><td>호환성</td><td>Flutter 앱 WebView 연동 고려한 반응형 · 브릿지 통신</td></tr>
+                  <tr><td>확장성</td><td>캠페인 · 소재 · 권한 추가에 유연한 데이터 모델</td></tr>
+                </tbody>
+              </table>
+
+              <h2>5. 기술 제약사항</h2>
+              <ul>
+                <li>백엔드: Supabase(PostgreSQL, Auth, Storage, Edge Functions) 필수 사용</li>
+                <li>프론트엔드: SEO 최적화 가능한 Next.js/React (프레임워크 협의 가능)</li>
+                <li>관리자 · 광고주 대시보드는 상용 UI 템플릿(MUI 등) 활용</li>
+                <li>사용자 게시판은 Flutter 앱 웹뷰(WebView)로 연동</li>
+                <li>AI 번역은 클라이언트 단 동작이되 API Key는 서버(Edge Functions) 프록시 경유, 번역 결과 DB 미저장</li>
+              </ul>
+
+              <h2>6. 범위 외 사항 (Out of Scope)</h2>
+              <ul>
+                <li>Flutter 앱 본체 개발 (웹뷰 브릿지 연동 협업은 포함)</li>
+                <li>광고 소재 디자인 제작 (소재 등록 · 노출 기능은 포함)</li>
+                <li>외부 광고 네트워크(AdMob 등) 연동 — 자체 광고 시스템 한정</li>
+                <li>관리자 · 광고주 대시보드 신규 디자인 (상용 템플릿 커스터마이징으로 대체)</li>
+                <li>서버 호스팅 · 도메인 · 외부 유료 API 비용</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+
+        <!-- PAGE: 일정 제안 -->
+        <div id="page-timeline" class="page-section space-y-6">
+          <div class="rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-soft backdrop-blur md:p-8">
+            <article class="doc-content">
+              <h1>일정 제안</h1>
+              <blockquote>총 60일 기준 단계별 마일스톤 및 산출물을 제안합니다. 클라이언트 제시 마일스톤(3주 내 어드민 · 캠페인, 6주 내 게시판 · 소재, 8주 내 트래킹 · 통계)에 맞춰 구성하였습니다.</blockquote>
+
+              <h2>전체 일정 요약</h2>
+              <table>
+                <thead>
+                  <tr><th>단계</th><th>기간</th><th>주요 산출물</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Phase 1: 기획/설계</td><td>Day 1–10</td><td>요구사항 정의서, ERD · RLS 설계, 사용자 게시판 화면설계, 어드민 템플릿 선정</td></tr>
+                  <tr><td>Phase 2: 어드민 &amp; 캠페인</td><td>Day 11–24</td><td>상용 템플릿 세팅, 회원/권한 관리, 게시판 관리, 광고 캠페인 · 소재 기능</td></tr>
+                  <tr><td>Phase 3: 사용자 게시판</td><td>Day 25–42</td><td>글/댓글/신고/스포일러/투표/좋아요/스크랩, 이미지 · 번역 · SEO, 광고 소재 노출</td></tr>
+                  <tr><td>Phase 4: 트래킹/통계 &amp; 광고주</td><td>Day 43–52</td><td>노출 · 클릭 트래킹 배치, 통계 그래프 · CSV, 광고주 대시보드, WebView 브릿지</td></tr>
+                  <tr><td>Phase 5: QA/배포</td><td>Day 53–60</td><td>통합 QA, 성능 최적화, 배포, 운영 · 관리자 매뉴얼</td></tr>
+                </tbody>
+              </table>
+            </article>
+          </div>
+
+          <div class="rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-soft backdrop-blur md:p-8">
+            <h2 class="mb-4 text-sm font-semibold tracking-[0.14em] text-slate-500">상세 타임라인</h2>
+            <div class="timeline">
+              <div class="timeline-item">
+                <p class="text-sm font-semibold tracking-[0.14em] text-sky-700">PHASE 1</p>
+                <h4 class="text-base font-semibold text-slate-900">기획 및 설계</h4>
+                <p class="mb-1 text-xs font-semibold text-amber-600">Day 1–10</p>
+                <p class="text-sm leading-7 text-slate-600">요구사항 정의, 정보구조 설계, 사용자 게시판 화면설계, Supabase ERD · RLS 정책 설계, 어드민 상용 템플릿(MUI 등) 선정</p>
+                <ul class="mt-2 list-disc pl-5 text-sm text-slate-500">
+                  <li>산출물: 요구사항 정의서, 화면설계서, ERD · RLS 설계서</li>
+                </ul>
+              </div>
+              <div class="timeline-item">
+                <p class="text-sm font-semibold tracking-[0.14em] text-sky-700">PHASE 2</p>
+                <h4 class="text-base font-semibold text-slate-900">어드민 &amp; 광고 캠페인</h4>
+                <p class="mb-1 text-xs font-semibold text-amber-600">Day 11–24</p>
+                <p class="text-sm leading-7 text-slate-600">상용 템플릿 세팅, 4단계 권한 승인 · 반려, 회원/게시판 관리(HTML 에디터 · 예약발행), 광고 캠페인 CRUD 및 5종 소재 관리</p>
+                <ul class="mt-2 list-disc pl-5 text-sm text-slate-500">
+                  <li>산출물: 관리자 어드민, 캠페인 · 소재 관리 기능 (M2)</li>
+                </ul>
+              </div>
+              <div class="timeline-item">
+                <p class="text-sm font-semibold tracking-[0.14em] text-sky-700">PHASE 3</p>
+                <h4 class="text-base font-semibold text-slate-900">사용자 게시판 (웹뷰)</h4>
+                <p class="mb-1 text-xs font-semibold text-amber-600">Day 25–42</p>
+                <p class="text-sm leading-7 text-slate-600">글 작성(익명/500자/이미지 3장), 댓글 · 대댓글 · 신고, 스포일러, 투표글, 좋아요 · 스크랩, 클라이언트 이미지 리사이징 · AI 번역 · SEO, 광고 소재 노출</p>
+                <ul class="mt-2 list-disc pl-5 text-sm text-slate-500">
+                  <li>산출물: 사용자 게시판(댓글/신고 포함) 및 5종 광고 소재 (M3)</li>
+                </ul>
+              </div>
+              <div class="timeline-item">
+                <p class="text-sm font-semibold tracking-[0.14em] text-sky-700">PHASE 4</p>
+                <h4 class="text-base font-semibold text-slate-900">트래킹/통계 &amp; 광고주 대시보드</h4>
+                <p class="mb-1 text-xs font-semibold text-amber-600">Day 43–52</p>
+                <p class="text-sm leading-7 text-slate-600">광고 노출 · 클릭 트래킹 배치 최적화, CTR 집계 그래프 · CSV, 광고주 로그인 · 통계 대시보드, Flutter WebView 브릿지 연동</p>
+                <ul class="mt-2 list-disc pl-5 text-sm text-slate-500">
+                  <li>산출물: 트래킹 · 통계 대시보드, 광고주 대시보드 (M4)</li>
+                </ul>
+              </div>
+              <div class="timeline-item">
+                <p class="text-sm font-semibold tracking-[0.14em] text-sky-700">PHASE 5</p>
+                <h4 class="text-base font-semibold text-slate-900">QA &amp; 배포</h4>
+                <p class="mb-1 text-xs font-semibold text-amber-600">Day 53–60</p>
+                <p class="text-sm leading-7 text-slate-600">통합 QA, 트래킹 부하 · 성능 최적화 검증, 배포, 운영 · 관리자 매뉴얼 작성 및 산출물 이관</p>
+                <ul class="mt-2 list-disc pl-5 text-sm text-slate-500">
+                  <li>산출물: 최종 빌드, 소스코드 · 스키마 · Edge Functions, 운영 매뉴얼 (M5)</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-soft backdrop-blur md:p-8">
+            <article class="doc-content">
+              <h2>마일스톤 체크포인트</h2>
+              <table>
+                <thead>
+                  <tr><th>마일스톤</th><th>시점</th><th>검수 기준</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>M1: 설계 완료</td><td>Day 10</td><td>요구사항 정의서 · ERD · 화면설계 승인</td></tr>
+                  <tr><td>M2: 어드민 · 캠페인 구현</td><td>Day 24</td><td>관리자 템플릿 세팅 및 광고 캠페인 기능 동작</td></tr>
+                  <tr><td>M3: 사용자 게시판 · 소재 구현</td><td>Day 42</td><td>게시판(댓글/신고 포함) 및 5종 광고 소재 노출</td></tr>
+                  <tr><td>M4: 트래킹/통계 완료</td><td>Day 52</td><td>노출 · 클릭 트래킹, 통계 대시보드 · CSV, 광고주 대시보드</td></tr>
+                  <tr><td>M5: 최종 납품</td><td>Day 60</td><td>통합 QA 완료, 배포, 산출물 · 매뉴얼 이관</td></tr>
+                </tbody>
+              </table>
+
+              <h2>커뮤니케이션 계획</h2>
+              <table>
+                <tr><th>항목</th><th>방식</th><th>주기</th></tr>
+                <tr><td>일일 진행 공유</td><td>Slack / 카카오톡</td><td>매일</td></tr>
+                <tr><td>주간 미팅</td><td>Zoom / Google Meet</td><td>주 1회</td></tr>
+                <tr><td>마일스톤 리뷰</td><td>화면 공유 + 문서</td><td>단계 완료 시</td></tr>
+                <tr><td>이슈 트래킹</td><td>GitHub Issues</td><td>상시</td></tr>
+              </table>
+            </article>
+          </div>
+        </div>
+
+        <!-- PAGE: 포트폴리오 -->
+        <div id="page-portfolio" class="page-section space-y-6">
+          <div class="rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-soft backdrop-blur md:p-8">
+            <article class="doc-content">
+              <h1>유사 프로젝트 경험</h1>
+              <blockquote>본 프로젝트와 유사한 기능/기술 스택을 활용한 수행 경험을 소개합니다.</blockquote>
+            </article>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <div class="rounded-2xl border border-slate-200/70 bg-white/90 p-4 text-center shadow-soft backdrop-blur"><p class="text-2xl font-bold text-sky-700">65 M/D</p><p class="mt-1 text-sm text-slate-500">총 산정 공수</p></div>
+            <div class="rounded-2xl border border-slate-200/70 bg-white/90 p-4 text-center shadow-soft backdrop-blur"><p class="text-2xl font-bold text-sky-700">5종</p><p class="mt-1 text-sm text-slate-500">광고 소재 유형</p></div>
+            <div class="rounded-2xl border border-slate-200/70 bg-white/90 p-4 text-center shadow-soft backdrop-blur"><p class="text-2xl font-bold text-sky-700">4단계</p><p class="mt-1 text-sm text-slate-500">사용자 권한(RBAC)</p></div>
+            <div class="rounded-2xl border border-slate-200/70 bg-white/90 p-4 text-center shadow-soft backdrop-blur"><p class="text-2xl font-bold text-sky-700">60일</p><p class="mt-1 text-sm text-slate-500">제안 기간</p></div>
+          </div>
+
+          <div class="space-y-4">
+            <div class="rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-soft backdrop-blur md:p-8">
+              <div class="mb-3 inline-flex rounded-full border px-2.5 py-1 text-sm font-semibold tracking-[0.12em] bg-sky-100 text-sky-700 border-sky-200">B2B SaaS · 어드민/RBAC</div>
+              <h3 class="text-lg font-semibold tracking-tight text-slate-900">EZ-Approve (전자결재 SaaS)</h3>
+              <p class="mt-1 text-xs text-slate-400">B2B SaaS / 기업용 소프트웨어 · 2026.01~2026.03</p>
+              <div class="mt-3 doc-content">
+                <h4>프로젝트 개요</h4>
+                <p>다단계 전자결재 엔진과 관리자 어드민을 갖춘 기업용 SaaS. 상용 UI 템플릿(MUI) 기반 어드민에 7종 사용자 역할과 6계층 권한(RBAC), 승인 · 반려 워크플로우를 구현했습니다.</p>
+                <h4>핵심 기능</h4>
+                <ul>
+                  <li>7 사용자 역할 RBAC(CASL) 및 승인 · 반려 워크플로우</li>
+                  <li>MUI 기반 어드민 대시보드 50+ 페이지, 120–150 API 엔드포인트</li>
+                  <li>Lexical 리치 에디터(26 커스텀 노드) — HTML 에디터 · 복수 이미지 업로드</li>
+                  <li>다국어, 전자서명 · 전자도장, 6계층 보안</li>
+                </ul>
+                <h4>본 프로젝트와의 유사점</h4>
+                <p>4단계 권한 승인 · 반려, 회원/게시판 관리 어드민, 게시글 HTML 에디터 · 이미지 업로드, 상용 UI 템플릿(MUI) 커스터마이징이 본 프로젝트의 관리자 영역과 직접 대응됩니다.</p>
+                <h4>기술 스택</h4>
+                <div class="flex flex-wrap gap-1.5 not-prose">
+                  <span class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-sm text-slate-500">NestJS</span>
+                  <span class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-sm text-slate-500">Next.js</span>
+                  <span class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-sm text-slate-500">TypeScript</span>
+                  <span class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-sm text-slate-500">MUI</span>
+                  <span class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-sm text-slate-500">Lexical</span>
+                  <span class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-sm text-slate-500">MySQL</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-soft backdrop-blur md:p-8">
+              <div class="mb-3 inline-flex rounded-full border px-2.5 py-1 text-sm font-semibold tracking-[0.12em] bg-sky-100 text-sky-700 border-sky-200">B2C · Supabase</div>
+              <h3 class="text-lg font-semibold tracking-tight text-slate-900">Calendar Share (소셜 캘린더 앱)</h3>
+              <p class="mt-1 text-xs text-slate-400">B2C 앱 / 소셜 · 2025.01~</p>
+              <div class="mt-3 doc-content">
+                <h4>프로젝트 개요</h4>
+                <p>Firebase · Supabase 듀얼 백엔드로 구축한 소셜 캘린더 앱. Supabase(PostgreSQL · Auth · Storage) 기반 데이터 모델과 소셜 인터랙션(좋아요=일정 추가), 이미지 처리를 구현했습니다.</p>
+                <h4>핵심 기능</h4>
+                <ul>
+                  <li>Supabase PostgreSQL · Auth · Storage 백엔드 구축</li>
+                  <li>좋아요 · 스크랩형 소셜 인터랙션, 7종 알림</li>
+                  <li>QR 오프라인 디스커버리, 45+ 스크린</li>
+                </ul>
+                <h4>본 프로젝트와의 유사점</h4>
+                <p>Supabase(PostgreSQL · Auth · Storage) 백엔드 구축, 좋아요 · 스크랩 소셜 기능, 이미지 업로드 처리가 본 프로젝트의 핵심 스택과 직접 대응됩니다.</p>
+                <h4>기술 스택</h4>
+                <div class="flex flex-wrap gap-1.5 not-prose">
+                  <span class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-sm text-slate-500">Supabase</span>
+                  <span class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-sm text-slate-500">PostgreSQL</span>
+                  <span class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-sm text-slate-500">Firebase</span>
+                  <span class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-sm text-slate-500">Flutter</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-soft backdrop-blur md:p-8">
+              <div class="mb-3 inline-flex rounded-full border px-2.5 py-1 text-sm font-semibold tracking-[0.12em] bg-amber-100 text-amber-700 border-amber-200">B2C · 광고 수익화</div>
+              <h3 class="text-lg font-semibold tracking-tight text-slate-900">Fortune App (라이프스타일 앱)</h3>
+              <p class="mt-1 text-xs text-slate-400">B2C 앱 / 광고 수익화 · 2024.07~2024.09</p>
+              <div class="mt-3 doc-content">
+                <h4>프로젝트 개요</h4>
+                <p>자체 광고 SDK와 포인트 · 리워드 이코노미를 갖춘 라이프스타일 앱. 광고 노출 · 클릭 트래킹과 데일리 체크인 리워드, 소셜 로그인을 구현했습니다.</p>
+                <h4>핵심 기능</h4>
+                <ul>
+                  <li>자체 광고 SDK(flutter_ads) — 광고 노출 · 클릭 트래킹, 소재 노출</li>
+                  <li>포인트 · 데일리 체크인 리워드 이코노미</li>
+                  <li>Google/Apple 소셜 로그인, 결과 공유</li>
+                </ul>
+                <h4>본 프로젝트와의 유사점</h4>
+                <p>자체 광고 시스템(노출 · 클릭 트래킹), 광고 소재 노출, 수익화 기반 마련이 본 프로젝트의 광고 캠페인 · 통계 영역과 직접 대응됩니다.</p>
+                <h4>기술 스택</h4>
+                <div class="flex flex-wrap gap-1.5 not-prose">
+                  <span class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-sm text-slate-500">Flutter</span>
+                  <span class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-sm text-slate-500">Firebase</span>
+                  <span class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-sm text-slate-500">Node.js</span>
+                  <span class="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-sm text-slate-500">BLoC</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="rounded-2xl border border-sky-200/70 bg-gradient-to-br from-sky-50 to-brand-50 p-6 text-center shadow-soft md:p-10">
+            <h2 class="text-xl font-bold tracking-tight text-slate-900 md:text-2xl">함께 만들어 가겠습니다</h2>
+            <p class="mx-auto mt-3 max-w-lg text-sm leading-7 text-slate-600">프로젝트에 대해 더 자세한 논의를 원하시면 미팅을 신청해 주세요.</p>
+          </div>
+        </div>
+
+        <!-- ─── Bottom Page Navigation ─── -->
+        <div id="page-nav" class="mt-6 flex items-center justify-between gap-4" style="display:none;">
+          <a id="nav-prev" href="#home"
+             class="group flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-white/90 px-5 py-3 shadow-soft backdrop-blur transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-white">
+            <svg class="w-5 h-5 text-slate-400 transition group-hover:text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            <span>
+              <span class="block text-xs text-slate-400">이전</span>
+              <span id="nav-prev-label" class="block text-sm font-semibold text-slate-700 group-hover:text-sky-700">홈</span>
+            </span>
+          </a>
+          <a id="nav-next" href="#overview"
+             class="group flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-white/90 px-5 py-3 shadow-soft backdrop-blur transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-white text-right ml-auto">
+            <span>
+              <span class="block text-xs text-slate-400">다음</span>
+              <span id="nav-next-label" class="block text-sm font-semibold text-slate-700 group-hover:text-sky-700">프로젝트 소개</span>
+            </span>
+            <svg class="w-5 h-5 text-slate-400 transition group-hover:text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </a>
+        </div>
+
+      </main>
+    </div>
+
+    <footer class="mt-10 border-t border-slate-200 pt-6 text-xs text-slate-500">
+      &copy; 2026 &middot; 본 제안서는 Supabase 기반 사용자 게시판 및 관리자/광고주 대시보드 구축 프로젝트를 위해 작성되었습니다.
+    </footer>
+  </div>
+
+  <!-- ─── SPA Router ─── -->
+  <script>
+    const pages = ['home', 'overview', 'estimate', 'manday', 'prd', 'timeline', 'portfolio'];
+    const pageLabels = {
+      home: '홈', overview: '프로젝트 소개', estimate: '견적서',
+      manday: '공수계산서', prd: 'PRD', timeline: '일정 제안', portfolio: '유사 프로젝트 경험'
+    };
+
+    function navigate(pageId) {
+      if (!pages.includes(pageId)) pageId = 'home';
+      document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
+      const target = document.getElementById('page-' + pageId);
+      if (target) target.classList.add('active');
+      document.querySelectorAll('.nav-link').forEach(link => {
+        if (link.dataset.page === pageId) {
+          link.className = 'nav-link block rounded-xl border px-3 py-2 text-sm border-sky-200 bg-sky-50 font-medium text-sky-700';
+        } else {
+          link.className = 'nav-link block rounded-xl border border-transparent px-3 py-2 text-sm text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900';
+        }
+      });
+      updatePageNav(pageId);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      closeSidebar();
+    }
+
+    function updatePageNav(pageId) {
+      const nav = document.getElementById('page-nav');
+      const idx = pages.indexOf(pageId);
+      const prevBtn = document.getElementById('nav-prev');
+      const nextBtn = document.getElementById('nav-next');
+      const prevLabel = document.getElementById('nav-prev-label');
+      const nextLabel = document.getElementById('nav-next-label');
+
+      nav.style.display = (pageId === 'home') ? 'none' : 'flex';
+
+      if (idx > 0) {
+        prevBtn.href = '#' + pages[idx - 1];
+        prevLabel.textContent = pageLabels[pages[idx - 1]];
+        prevBtn.style.visibility = 'visible';
+      } else {
+        prevBtn.style.visibility = 'hidden';
+      }
+
+      if (idx < pages.length - 1) {
+        nextBtn.href = '#' + pages[idx + 1];
+        nextLabel.textContent = pageLabels[pages[idx + 1]];
+        nextBtn.style.visibility = 'visible';
+      } else {
+        nextBtn.style.visibility = 'hidden';
+      }
+    }
+
+    function closeSidebar() {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebar-backdrop').classList.remove('open');
+    }
+
+    function handleHash() {
+      const hash = (location.hash || '#home').replace('#', '');
+      navigate(hash);
+    }
+    window.addEventListener('hashchange', handleHash);
+    window.addEventListener('DOMContentLoaded', handleHash);
+
+    document.getElementById('sidebar-toggle').addEventListener('click', function() {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-backdrop').classList.toggle('open');
+    });
+  </script>
+</body>
+</html>

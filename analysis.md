@@ -55,10 +55,11 @@ job:
 | 프로젝트 | 매칭 근거 | 점수 |
 |---------|----------|------|
 | **EZ-Approve** | 상용 UI 템플릿(MUI) 어드민, RBAC 7역할/승인·반려, HTML 리치 에디터·이미지 업로드 → 관리자 영역 직접 대응 | ★★★★★ |
-| **Calendar Share** | Supabase(PostgreSQL·Auth·Storage) 백엔드 구축, 좋아요·스크랩 소셜, 이미지 업로드 → 핵심 스택 직접 대응 | ★★★★★ |
+| **Series-B** | 다역할 포탈, 본인 데이터 한정 통계·데이터 대시보드, 역할별 권한 승인 워크플로우 → 광고주 대시보드·CTR 통계·4단계 권한 직접 대응 | ★★★★★ |
 | **Fortune App** | 자체 광고 SDK 노출·클릭 트래킹, 광고 소재 노출, 수익화 → 광고 캠페인·통계 영역 직접 대응 | ★★★★☆ |
 
-세 프로젝트가 각각 어드민/RBAC, Supabase 백엔드, 자체 광고 트래킹의 3대 축을 정확히 커버.
+세 프로젝트가 각각 어드민/RBAC, 통계 대시보드/다역할 포탈, 자체 광고 트래킹의 3대 축을 정확히 커버.
+(사용자 요청으로 Calendar Share → Series-B 교체. 남은 포트폴리오 중 Supabase 직접 레퍼런스는 없으나 제안서 본문에서 Supabase 역량 유지.)
 
 ## 5. 최종 제안 요약
 
@@ -140,11 +141,11 @@ https://proposal-router.claude-ai-b27.workers.dev/proposal-supabase-community-bo
 - 유사점: 4단계 권한 승인·반려, 게시판 관리 어드민, HTML 에디터·이미지 업로드, 상용 템플릿(MUI) 커스터마이징
 - 기술 스택: NestJS, Next.js, TypeScript, MUI, Lexical, MySQL
 
-▶ Calendar Share (소셜 캘린더 앱) (2025.01~)
-- 프로젝트 유형: B2C 앱 / 소셜 (Supabase)
-- 핵심 기능: Supabase(PostgreSQL·Auth·Storage) 백엔드, 좋아요·스크랩 소셜, 이미지 처리
-- 유사점: Supabase 풀스택 구축, 좋아요·스크랩 기능, 이미지 업로드 — 본 프로젝트 핵심 스택 직접 대응
-- 기술 스택: Supabase, PostgreSQL, Firebase, Flutter
+▶ Series-B (펀드 관리 플랫폼) (2023.11~2024.12)
+- 프로젝트 유형: 핀테크 / 데이터 포탈 · 통계 대시보드
+- 핵심 기능: 다역할 포탈, 통계·데이터 대시보드 및 집계 리포트, 역할별 권한 승인 워크플로우, 5계층 보안
+- 유사점: 다역할(관리자/광고주/유료/무료) 권한 포탈, 본인 데이터 한정 통계 대시보드, 집계 그래프·리포트 — 광고주 대시보드·CTR 통계·4단계 권한 직접 대응
+- 기술 스택: Next.js, NestJS, TypeScript, MySQL, AWS
 
 ▶ Fortune App (라이프스타일 앱) (2024.07~2024.09)
 - 프로젝트 유형: B2C 앱 / 광고 수익화
@@ -175,5 +176,5 @@ https://proposal-router.claude-ai-b27.workers.dev/proposal-supabase-community-bo
 
 ### 관련 포트폴리오 추천
 1. EZ-Approve — 상용 UI 템플릿(MUI) 어드민, RBAC·승인/반려, HTML 리치 에디터
-2. Calendar Share — Supabase(PostgreSQL·Auth·Storage) 풀스택 백엔드, 좋아요·스크랩 소셜
+2. Series-B — 다역할 포탈, 통계·데이터 대시보드, 역할별 권한 승인 워크플로우
 3. Fortune App — 자체 광고 노출·클릭 트래킹, 광고 수익화
